@@ -53,7 +53,7 @@ class AICore:
                 if data:
                     parts.append(types.Part.from_bytes(data=data, mime_type=attachment.content_type))
         
-        parts.append(prompt)
+        parts.append(types.Part.from_text(text=prompt))
         contents.append(types.Content(role="user", parts=parts))
 
         try:
