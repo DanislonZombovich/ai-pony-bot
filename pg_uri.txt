@@ -1,0 +1,1 @@
+postgresql://avnadmin:<redacted>@discord-bot-pg-danislonzombovich.h.aivencloud.com:20470/defaultdb?sslmode=require
