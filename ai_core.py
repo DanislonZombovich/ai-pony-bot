@@ -1,3 +1,5 @@
+from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
+
 from google import genai
 from google.genai import types
 import aiohttp
@@ -5,6 +7,19 @@ import os
 import io
 
 class AICore:
+
+    @retry(
+        wait=wait_exponential(multiplier=1, min=4, max=30), 
+        stop=stop_after_attempt(5),
+        reraise=True
+    )
+    async def _generate_content_with_retry(self, contents, config):
+        return await self.client.aio.models.generate_content(
+            model=self.model_name,
+            contents=contents,
+            config=config
+        )
+
     def __init__(self, client: genai.Client, model_name: str = "gemini-3.1-flash-lite"):
         self.client = client
         self.model_name = model_name
@@ -57,15 +72,13 @@ class AICore:
         contents.append(types.Content(role="user", parts=parts))
 
         try:
-            response = await self.client.aio.models.generate_content(
-                model=self.model_name,
-                contents=contents,
-                config=config
-            )
+            response = await self._generate_content_with_retry(contents, config)
             
             function_calls = response.function_calls if hasattr(response, 'function_calls') else []
             return response.text, function_calls
             
         except Exception as e:
             print(f"Error generating content: {e}")
+            if "503" in str(e) or "Service Unavailable" in str(e):
+                return "Сейчас я очень перегружена запросами, подожди немного, мой босс! 🦄", []
             return "Произошла ошибка при обращении к нейросети.", []

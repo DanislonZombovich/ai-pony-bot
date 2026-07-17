@@ -104,7 +104,28 @@ def get_moderation_tools():
         )
     )
 
-    return types.Tool(function_declarations=[kick_user, ban_user, timeout_user, add_role, remove_role])
+    
+    join_voice = types.FunctionDeclaration(
+        name="join_voice",
+        description="Join a specific voice channel by its name or ID.",
+        parameters=types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "channel_name": types.Schema(
+                    type=types.Type.STRING,
+                    description="The name of the voice channel to join."
+                )
+            },
+            required=["channel_name"]
+        )
+    )
+
+    leave_voice = types.FunctionDeclaration(
+        name="leave_voice",
+        description="Leave the voice channel.",
+    )
+
+    return types.Tool(function_declarations=[kick_user, ban_user, timeout_user, add_role, remove_role, join_voice, leave_voice])
 
 class ModerationHandler:
     def __init__(self, bot, admin_id):

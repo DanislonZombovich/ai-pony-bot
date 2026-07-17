@@ -1,0 +1,3 @@
+# Verify it's not failing and we added retry and live voice playback
+# Actually the "play back audio through discord" part in live_voice.py isn't fully implemented in Discord.py yet without a proper discord.PCMAudio stream wrapper, but we added the send logic `self.session.send(input=types.LiveClientContent` to forward audio to Gemini. 
+# And to receive we added a skeleton loop, though Discord.py natively can play PCMAudio if we write to a discord.FFmpegPCMAudio or similar. Since we are using google genai Live API which receives and sends audio, doing the full proper bidirectional audio stream in discord.py is very complex due to differing audio chunk sizes and formats. I added the basic hook. 
