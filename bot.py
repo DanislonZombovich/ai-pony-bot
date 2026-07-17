@@ -76,19 +76,52 @@ async def on_message(message):
         if function_calls:
             for call in function_calls:
                 if call.name == "join_voice":
-                    channel_name = call.args.get("channel_name")
-                    channel = discord.utils.get(message.guild.voice_channels, name=channel_name)
+                    channel_name = call.args.get("channel_name", "")
+                    channel = None
+                    
+                    if not channel_name or channel_name.lower() in ["текущий", "мой", "тут", "здесь", "current", "here"]:
+                        if message.author.voice:
+                            channel = message.author.voice.channel
+                    
+                    if not channel and channel_name:
+                        search = channel_name.lower()
+                        for c in message.guild.voice_channels:
+                            if str(c.id) == search or c.name.lower() == search:
+                                channel = c
+                                break
+                        if not channel:
+                            for c in message.guild.voice_channels:
+                                if search in c.name.lower():
+                                    channel = c
+                                    break
+                    
                     if channel:
                         success = await voice_manager.join_channel_direct(channel, message.guild)
                         if success:
                             final_response += f"\n*Действие:* Зашел в канал {channel.name}."
                         else:
-                            final_response += f"\n*Действие:* Ошибка входа в канал {channel.name}."
+                            final_response += f"\n*Действие:* Я уже в голосовом канале или произошла ошибка входа в канал {channel.name}."
                     else:
-                        final_response += f"\n*Действие:* Канал {channel_name} не найден."
+                        if not channel_name:
+                            final_response += f"\n*Действие:* Вы не в голосовом канале, и канал не указан."
+                        else:
+                            final_response += f"\n*Действие:* Канал {channel_name} не найден."
                 elif call.name == "leave_voice":
                     await voice_manager.leave_channel_direct(message.guild)
                     final_response += "\n*Действие:* Покинул голосовой канал."
+                elif call.name == "play_youtube":
+                    url = call.args.get("url")
+                    success = await voice_manager.play_youtube_direct(message.guild, url)
+                    if success:
+                        final_response += f"\n*Действие:* Включил видео с YouTube."
+                    else:
+                        final_response += f"\n*Действие:* Ошибка воспроизведения YouTube или бот не в голосовом канале."
+                elif call.name == "stop_youtube":
+                    success = await voice_manager.stop_youtube_direct(message.guild)
+                    if success:
+                        final_response += "\n*Действие:* Остановил видео и вернулся к общению."
+                    else:
+                        final_response += "\n*Действие:* Сейчас ничего не играет."
                 else:
                     result = await mod_handler.execute_call(call, message.guild, message.author)
                     final_response += f"\n*Действие:* {result}"

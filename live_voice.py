@@ -6,6 +6,9 @@ from google.genai import types
 import traceback
 import audioop
 import time
+import yt_dlp
+import os
+
 
 class VoiceManager:
     def __init__(self, bot, genai_client: genai.Client):
@@ -51,6 +54,73 @@ class VoiceManager:
             return True
         return False
 
+
+    async def play_youtube_direct(self, guild, url):
+        if guild.id not in self.active_sessions:
+            return False
+            
+        session_data = self.active_sessions[guild.id]
+        vc = session_data["vc"]
+        
+        # Stop current playback
+        if vc.is_playing():
+            vc.stop()
+            
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'outtmpl': f'%(id)s_{guild.id}.%(ext)s',
+            'quiet': True,
+            'no_warnings': True
+        }
+        
+        try:
+            loop = asyncio.get_event_loop()
+            def extract():
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    url2 = info['url']
+                    return url2
+                    
+            url2 = await loop.run_in_executor(None, extract)
+            
+            FFMPEG_OPTIONS = {
+                'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+                'options': '-vn'
+            }
+            
+            source = discord.FFmpegPCMAudio(url2, **FFMPEG_OPTIONS)
+            vc.play(source)
+            session_data["playing_yt"] = True
+            return True
+        except Exception as e:
+            traceback.print_exc()
+            return False
+
+    async def stop_youtube_direct(self, guild):
+        if guild.id not in self.active_sessions:
+            return False
+            
+        session_data = self.active_sessions[guild.id]
+        if not session_data.get("playing_yt"):
+            return False
+            
+        vc = session_data["vc"]
+        if vc.is_playing():
+            vc.stop()
+            
+        # Resume AI Live playback source
+        source = LiveAudioSource()
+        session_data["source"] = source
+        vc.play(source)
+        session_data["playing_yt"] = False
+        return True
+
+
     async def _live_session_task(self, guild_id, vc, queue):
         config = types.LiveConnectConfig(
             response_modalities=[types.Modality.AUDIO],
@@ -58,12 +128,13 @@ class VoiceManager:
         )
         
         try:
-            async with self.genai_client.aio.live.connect(model="models/gemini-2.0-flash-exp", config=config) as session:
+            async with self.genai_client.aio.live.connect(model="gemini-2.5-flash-native-audio-latest", config=config) as session:
                 loop = asyncio.get_running_loop()
                 sink = LiveAudioSink(queue, loop)
                 vc.listen(sink)
 
                 source = LiveAudioSource()
+                self.active_sessions[guild_id]["source"] = source
                 vc.play(source)
 
                 send_state = {"cv": None}
@@ -96,7 +167,8 @@ class VoiceManager:
                                     mono_data = part.inline_data.data
                                     resampled, recv_state["cv"] = audioop.ratecv(mono_data, 2, 1, 24000, 48000, recv_state["cv"])
                                     stereo = audioop.tostereo(resampled, 2, 1, 1)
-                                    source.add_audio(stereo)
+                                    if guild_id in self.active_sessions and not self.active_sessions[guild_id].get("playing_yt"):
+                                        self.active_sessions[guild_id]["source"].add_audio(stereo)
 
                 await asyncio.gather(send_loop(), receive_loop())
                 

@@ -1,0 +1,1 @@
+postgresql://ponyadmin:AVNS_VWlShMNVWmd0Fcd8bk8@ai-pony-db-danislon-zombovich.d.aivencloud.com:20470/defaultdb?sslmode=require
