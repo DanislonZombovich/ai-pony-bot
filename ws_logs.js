@@ -28,23 +28,22 @@ getWsCreds((creds) => {
   ws.on('open', function open() {
     ws.send(JSON.stringify({"event":"auth","args":[creds.token]}));
     
-    // We send start and just read logs
-    ws.send(JSON.stringify({"event":"send logs","args":[null]}));
+    // Request logs ONLY (do not start)
     setTimeout(() => {
-        ws.send(JSON.stringify({"event":"set state","args":["start"]}));
+      ws.send(JSON.stringify({"event":"send logs","args":[null]}));
     }, 1000);
   });
 
+  let logs = [];
   ws.on('message', function incoming(data) {
     const msg = JSON.parse(data);
     if (msg.event === 'console output') {
-      console.log(msg.args[0]);
-    } else if (msg.event === 'status') {
-      console.log('Status:', msg.args[0]);
+      logs.push(msg.args[0]);
     }
   });
 
   setTimeout(() => {
     ws.close();
-  }, 20000); 
+    console.log(logs.slice(-100).join('\n'));
+  }, 10000); 
 });
